@@ -1,0 +1,124 @@
+.chess-board-container {
+  position: relative;
+  display: inline-block;
+}
+
+.chess-board {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(8, 1fr);
+  width: 480px;
+  height: 480px;
+  border: 3px solid #333;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.square {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 48px;
+}
+
+.square.light {
+  background-color: #f0d9b5;
+}
+
+.square.dark {
+  background-color: #b58863;
+}
+
+.square.selected {
+  background-color: #f6f669 !important;
+  box-shadow: inset 0 0 0 3px #333;
+}
+
+.square.legal-move {
+  position: relative;
+}
+
+.square.legal-move::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.legal-move-indicator {
+  width: 20px;
+  height: 20px;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 50%;
+  position: absolute;
+  z-index: 1;
+}
+
+.square:hover:not(.loading) {
+  background-color: rgba(246, 246, 105, 0.5) !important;
+}
+
+.square.loading {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.piece {
+  z-index: 2;
+  position: relative;
+  user-select: none;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.piece.current-turn {
+  filter: drop-shadow(0 0 3px rgba(0, 255, 0, 0.5));
+}
+
+.board-labels {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.file-labels {
+  position: absolute;
+  bottom: -25px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  font-weight: bold;
+  color: #333;
+}
+
+.rank-labels {
+  position: absolute;
+  left: -25px;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  font-weight: bold;
+  color: #333;
+}
+
+@media (max-width: 600px) {
+  .chess-board {
+    width: 360px;
+    height: 360px;
+  }
+  
+  .square {
+    font-size: 36px;
+  }
+}
+
