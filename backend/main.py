@@ -3,10 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import chess
 import chess.svg
+import chess.engine
 from typing import Optional, List
 import uuid
 import random
 app = FastAPI(title="Chess Game API")
+
+ENGINE_PATH = "/usr/local/bin/stockfish"
 
 # CORS middleware to allow React frontend to connect
 app.add_middleware(
@@ -91,10 +94,15 @@ def make_move(game_id: str, move_request: MoveRequest):
     # Make the move
     board.push(move)
 
+    engine = chess.engine.SimpleEngine.popen_uci(ENGINE_PATH)
+    limit = chess.engine.Limit(time=0.1) # Think for 0.1 seconds
+    result = engine.play(board, limit)
+
+    print("result :", result.move.uci())
+
     # if it's black's turn, make the first legal move
     if(board.turn == chess.BLACK):
-        legal_moves = [move.uci() for move in board.legal_moves]
-        board.push(chess.Move.from_uci(legal_moves[random.randint(0, len(legal_moves) - 1)]))
+        board.push(chess.Move.from_uci(result.move.uci()))
     
     return get_game_state(game_id)
 
