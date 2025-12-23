@@ -24,6 +24,11 @@ export const makeMove = async (gameId, move) => {
   return response.data;
 };
 
+export const toggleAnalysis = async (gameId) => {
+  const response = await api.post(`/api/games/${gameId}/toggle-analysis`);
+  return response.data;
+};
+
 export const getLegalMoves = async (gameId, square = null) => {
   const params = square ? { square } : {};
   const response = await api.get(`/api/games/${gameId}/legal-moves`, { params });

@@ -7,9 +7,18 @@ import chess.engine
 from typing import Optional, List
 import uuid
 import random
+import openai
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 app = FastAPI(title="Chess Game API")
 
 ENGINE_PATH = "/usr/local/bin/stockfish"
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 
 # CORS middleware to allow React frontend to connect
 app.add_middleware(
@@ -22,6 +31,7 @@ app.add_middleware(
 
 # In-memory game storage (in production, use a database)
 games = {}
+games_metadata = {}
 
 
 class GameCreate(BaseModel):
@@ -43,6 +53,8 @@ class GameResponse(BaseModel):
     legal_moves: List[str]
     move_history: List[str]
     board_svg: str
+    analysis: str
+    is_analysis_on: bool
 
 
 @app.get("/")
@@ -56,7 +68,9 @@ def create_game():
     game_id = str(uuid.uuid4())
     board = chess.Board()
     games[game_id] = board
-    
+    games_metadata[game_id] = {
+        "is_analysis_on": False
+    }
     return get_game_state(game_id)
 
 
@@ -68,6 +82,15 @@ def get_game(game_id: str):
     return get_game_state(game_id)
 
 
+@app.post("/api/games/{game_id}/toggle-analysis", response_model=GameResponse)
+def toggle_analysis(game_id: str):
+    """Toggle analysis on or off"""
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    games_metadata[game_id]['is_analysis_on'] = not games_metadata[game_id]['is_analysis_on']
+    return get_game_state(game_id)
+
 @app.post("/api/games/{game_id}/move", response_model=GameResponse)
 def make_move(game_id: str, move_request: MoveRequest):
     """Make a move in the game"""
@@ -75,7 +98,7 @@ def make_move(game_id: str, move_request: MoveRequest):
         raise HTTPException(status_code=404, detail="Game not found")
     
     board = games[game_id]
-    
+    metadata = games_metadata[game_id]
     # Try to parse the move
     try:
         # First try UCI format
@@ -98,13 +121,53 @@ def make_move(game_id: str, move_request: MoveRequest):
     limit = chess.engine.Limit(time=0.1) # Think for 0.1 seconds
     result = engine.play(board, limit)
 
-    print("result :", result.move.uci())
-
     # if it's black's turn, make the first legal move
     if(board.turn == chess.BLACK):
         board.push(chess.Move.from_uci(result.move.uci()))
+
+    # Afte the above line of code it's white's turn    
+    suggest_move_for_white = engine.play(board, limit)
+    print("suggest_move_for_white :", suggest_move_for_white.move.uci())
+
+    temp_board = chess.Board()
+    move_history = []
+    for move in board.move_stack:
+        move_history.append(temp_board.san(move))
+        temp_board.push(move)
+
+    fen = board.fen()
+    suggested_move = suggest_move_for_white.move.uci()
+
+    analysis = ""
+    if metadata["is_analysis_on"]:
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", 
+                "content": """You are an expert chess player. 
+                Help explain the reasoning behind the move played by the player and suggest 
+                if a better move is available otherwise explain why the move is good. 
+                The moves are being suggested by a chess engine which will only suggest legal moves.
+                Do not question the move suggested by the engine instead explain the reasoning behind the move or if you find a better move suggest it.
+                You will also be give the history of the moves played so far and
+                the board state at the time of the move. Keep the reply brief and to the point."""},
+                { "role": "user", 
+                "content": f"""
+                    Here is the history of the moves along with the board state and also the suggested move.
+                    "move_history": {move_history},
+                    "board_state": {fen},
+                    "suggested_move": {suggested_move}
+                """
+                }
+            ]
+        )
+
+        analysis = response.choices[0].message.content
     
-    return get_game_state(game_id)
+
+    
+    
+    return get_game_state(game_id, analysis)
 
 
 @app.get("/api/games/{game_id}/legal-moves")
@@ -139,10 +202,10 @@ def delete_game(game_id: str):
     return {"message": "Game deleted"}
 
 
-def get_game_state(game_id: str) -> GameResponse:
+def get_game_state(game_id: str, analysis: str = "") -> GameResponse:
     """Helper function to get game state"""
     board = games[game_id]
-    
+    metadata = games_metadata[game_id]
     # Get legal moves as UCI strings
     legal_moves = [move.uci() for move in board.legal_moves]
     
@@ -166,6 +229,8 @@ def get_game_state(game_id: str) -> GameResponse:
         is_game_over=board.is_game_over(),
         legal_moves=legal_moves,
         move_history=move_history,
-        board_svg=board_svg
+        board_svg=board_svg,
+        analysis=analysis,
+        is_analysis_on=metadata['is_analysis_on']
     )
 

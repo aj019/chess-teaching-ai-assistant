@@ -1,7 +1,8 @@
 import React from 'react';
 import './GameInfo.css';
+import Markdown from 'react-markdown';
 
-const GameInfo = ({ gameState, onNewGame, onRefresh }) => {
+const GameInfo = ({ gameState, onNewGame, onRefresh, onAnalysisToggle }) => {
   if (!gameState) return null;
 
   const getStatusMessage = () => {
@@ -55,11 +56,19 @@ const GameInfo = ({ gameState, onNewGame, onRefresh }) => {
         <button onClick={onRefresh} className="btn btn-secondary">
           Refresh
         </button>
+        <button onClick={onAnalysisToggle} className="btn btn-secondary">
+          {gameState.is_analysis_on ? 'Disable Analysis' : 'Enable Analysis'}
+        </button>
       </div>
 
       <div className="info-section">
         <p><strong>Legal Moves:</strong> {gameState.legal_moves.length}</p>
         <p><strong>FEN:</strong> <code>{gameState.fen}</code></p>
+      </div>
+
+      <div className="info-section">
+        <h3>Analysis</h3>
+        <p><Markdown>{gameState.analysis}</Markdown></p>
       </div>
     </div>
   );

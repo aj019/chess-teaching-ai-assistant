@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import ChessBoard from './components/ChessBoard';
 import GameInfo from './components/GameInfo';
-import { createGame, getGame, makeMove as apiMakeMove } from './services/api';
+import { createGame, getGame, makeMove as apiMakeMove, toggleAnalysis as apiToggleAnalysis } from './services/api';
 
 function App() {
   const [gameId, setGameId] = useState(null);
@@ -84,6 +84,16 @@ function App() {
     }
   };
 
+  const toggleAnalysis = async () => {
+    if (!gameId) return;
+    try {
+      const game = await apiToggleAnalysis(gameId);
+      setGameState(game);
+    } catch (err) {
+      setError('Failed to toggle analysis: ' + err.message);
+    }
+  };
+
   return (
     <div className="App">
       <div className="container">
@@ -108,6 +118,7 @@ function App() {
                 gameState={gameState}
                 onNewGame={startNewGame}
                 onRefresh={refreshGame}
+                onAnalysisToggle={toggleAnalysis}
               />
             </>
           )}
