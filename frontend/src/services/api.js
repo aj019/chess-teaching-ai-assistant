@@ -24,6 +24,11 @@ export const makeMove = async (gameId, move) => {
   return response.data;
 };
 
+export const makeNextMove = async (gameId, move) => {
+  const response = await api.post(`/api/games/${gameId}/next-move`, { move });
+  return response.data;
+};
+
 export const toggleAnalysis = async (gameId) => {
   const response = await api.post(`/api/games/${gameId}/toggle-analysis`);
   return response.data;

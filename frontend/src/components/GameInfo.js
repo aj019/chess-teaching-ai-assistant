@@ -1,8 +1,55 @@
-import React from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import './GameInfo.css';
 import Markdown from 'react-markdown';
 
-const GameInfo = ({ gameState, onNewGame, onRefresh, onAnalysisToggle }) => {
+const GameInfo = ({ gameState, onNewGame, onRefresh, onAnalysisToggle, onNextMove }) => {
+  const intervalRef = useRef(null);
+  const [isLooping, setIsLooping] = useState(false);
+
+  useEffect(() => {
+    // Stop the loop if the game is over
+    if (gameState?.is_game_over && intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      setIsLooping(false);
+    }
+    // Cleanup on component unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+    // eslint-disable-next-line
+  }, [gameState?.is_game_over]);
+
+  const handleStartNextMoveLoop = useCallback(() => {
+    // If already running, don't start again
+    if (intervalRef.current || isLooping) return;
+
+    setIsLooping(true);
+    // Call immediately for instant feedback
+    onNextMove();
+
+    intervalRef.current = setInterval(() => {
+      if (gameState?.is_game_over) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+        setIsLooping(false);
+        return;
+      }
+      onNextMove();
+    }, 10000);
+  }, [onNextMove, gameState?.is_game_over, isLooping]);
+
+  const handleStopNextMoveLoop = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      setIsLooping(false);
+    }
+  };
+
   if (!gameState) return null;
 
   const getStatusMessage = () => {
@@ -53,11 +100,18 @@ const GameInfo = ({ gameState, onNewGame, onRefresh, onAnalysisToggle }) => {
         <button onClick={onNewGame} className="btn btn-primary">
           New Game
         </button>
-        <button onClick={onRefresh} className="btn btn-secondary">
+        {/* <button onClick={onRefresh} className="btn btn-secondary">
           Refresh
-        </button>
+        </button> */}
         <button onClick={onAnalysisToggle} className="btn btn-secondary">
           {gameState.is_analysis_on ? 'Disable Analysis' : 'Enable Analysis'}
+        </button>
+        <button
+          className="btn btn-secondary"
+          onClick={isLooping ? handleStopNextMoveLoop : handleStartNextMoveLoop}
+          disabled={gameState.is_game_over}
+        >
+          {isLooping ? "Stop Match" : "Start Match"}
         </button>
       </div>
 

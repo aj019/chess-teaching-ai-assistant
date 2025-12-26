@@ -1,6 +1,15 @@
 import React from 'react';
 import './ChessBoard.css';
 
+const LoaderWithText = ({ turn }) => (
+  <div className="loader-overlay" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="loader-spinner" />
+    <div style={{ color: '#333', fontWeight: 'bold', marginTop: 16, fontSize: 22 }}>
+      {turn === 'white' ? 'GPT 5.2 (White) Thinking ' : 'Claude Opus 4.5 (Black) Thinking '}
+    </div>
+  </div>
+);
+
 const ChessBoard = ({ gameState, selectedSquare, onSquareClick, loading }) => {
   if (!gameState) return null;
 
@@ -35,7 +44,7 @@ const ChessBoard = ({ gameState, selectedSquare, onSquareClick, loading }) => {
   };
 
   const piecePositions = parseFEN(gameState.fen);
-  
+
   // Get legal moves for selected square
   const getLegalMovesForSquare = (square) => {
     if (!selectedSquare || selectedSquare !== square) return [];
@@ -98,7 +107,8 @@ const ChessBoard = ({ gameState, selectedSquare, onSquareClick, loading }) => {
   }
 
   return (
-    <div className="chess-board-container">
+    <div className="chess-board-container" style={{ position: 'relative' }}>
+      {loading && <LoaderWithText turn={gameState.turn} />}
       <div className="chess-board">
         {squares}
       </div>
@@ -119,4 +129,3 @@ const ChessBoard = ({ gameState, selectedSquare, onSquareClick, loading }) => {
 };
 
 export default ChessBoard;
-

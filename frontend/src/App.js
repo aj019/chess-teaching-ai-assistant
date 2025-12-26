@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import ChessBoard from './components/ChessBoard';
 import GameInfo from './components/GameInfo';
-import { createGame, getGame, makeMove as apiMakeMove, toggleAnalysis as apiToggleAnalysis } from './services/api';
+import { createGame, getGame, makeMove as apiMakeMove, toggleAnalysis as apiToggleAnalysis, makeNextMove as apiNextMove } from './services/api';
 
 function App() {
   const [gameId, setGameId] = useState(null);
@@ -94,10 +94,25 @@ function App() {
     }
   };
 
+  const nextMove = async () => {
+    if (!gameId) return;
+    try {
+      setLoading(true);
+      setError(null);
+      const game = await apiNextMove(gameId);
+      setGameState(game);
+      setLoading(false);
+    } catch (err) {
+      setLoading(false);
+      setError('Failed to get next move: ' + err.message);
+    }
+  };
+
   return (
     <div className="App">
       <div className="container">
-        <h1>Chess Game</h1>
+        <h1>Chess Game - Claude Opus 4.5 (Black) vs GPT 5.2 (White)</h1>
+        
         
         {error && (
           <div className="error-message">
@@ -119,6 +134,7 @@ function App() {
                 onNewGame={startNewGame}
                 onRefresh={refreshGame}
                 onAnalysisToggle={toggleAnalysis}
+                onNextMove={nextMove}
               />
             </>
           )}

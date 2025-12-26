@@ -1,13 +1,14 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import chess
 import chess.svg
 import chess.engine
 from typing import Optional, List
 import uuid
 import random
-import openai
+from openai import OpenAI
+from openrouter import OpenRouter
 import os
 from dotenv import load_dotenv
 
@@ -18,6 +19,13 @@ app = FastAPI(title="Chess Game API")
 ENGINE_PATH = "/usr/local/bin/stockfish"
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+openai = OpenAI(
+  base_url= "https://openrouter.ai/api/v1",
+  api_key= OPENROUTER_API_KEY  
+)
+
+client = OpenRouter(api_key=OPENROUTER_API_KEY)
 
 
 # CORS middleware to allow React frontend to connect
@@ -40,6 +48,13 @@ class GameCreate(BaseModel):
 
 class MoveRequest(BaseModel):
     move: str  # UCI format (e.g., "e2e4") or SAN format (e.g., "e4")
+
+
+class AIMoveResponse(BaseModel):
+    """
+    Response model for AI move suggestions
+    """
+    move: str = Field(description="The suggested move in UCI format (e.g., 'e2e4')")    
 
 
 class GameResponse(BaseModel):
@@ -91,8 +106,62 @@ def toggle_analysis(game_id: str):
     games_metadata[game_id]['is_analysis_on'] = not games_metadata[game_id]['is_analysis_on']
     return get_game_state(game_id)
 
+
+async def get_next_move_from_ai(model: str, board: chess.Board) -> str:
+    fen = board.fen()
+    move_history = []
+    temp_board = chess.Board()
+    for move in board.move_stack:
+        move_history.append(temp_board.san(move))
+        temp_board.push(move)
+    
+    # Get the JSON schema - structure it correctly for OpenRouter
+    schema = AIMoveResponse.model_json_schema()
+    
+    # Use the openai client which is configured for OpenRouter
+    response = openai.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", 
+                "content": """You are an expert chess player. 
+                Given the current board state and move history, suggest the next best move in UCI format.
+                Only output the move in UCI format, no other text or explanation.
+                For eg "e2e4" is a valid move, "e2e4e5" is not a valid move. "e2" is also not a valid move.
+                "Nf3" is also not a valid move as it is not in UCI format. Strictly follow the UCI format.
+                """},
+                { "role": "user", 
+                "content": f"""
+                    Here is the history of the moves along with the board state. Suggest the next best move.
+                    Move history: {move_history}
+                    Board state (FEN): {fen}
+                    Return the move in UCI format (e.g., "e2e4")
+                """
+                }
+            ],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "AIMoveResponse",
+                    "schema": schema
+                }
+            }
+        )
+
+    content = response.choices[0].message.content
+    # Parse the JSON response
+    import json
+    try:
+        move_data = json.loads(content)
+        return move_data.get("move", "")
+    except json.JSONDecodeError:
+        # If JSON parsing fails, try to extract the move from the content
+        # Remove any whitespace and newlines
+        content = content.strip().replace("\n", "").replace("\r", "")
+        return content
+
+
 @app.post("/api/games/{game_id}/move", response_model=GameResponse)
-def make_move(game_id: str, move_request: MoveRequest):
+async def make_move(game_id: str, move_request: MoveRequest):
     """Make a move in the game"""
     if game_id not in games:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -140,7 +209,7 @@ def make_move(game_id: str, move_request: MoveRequest):
 
     analysis = ""
     if metadata["is_analysis_on"]:
-        response = openai.chat.completions.create(
+        response = client.chat.send(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", 
@@ -161,13 +230,35 @@ def make_move(game_id: str, move_request: MoveRequest):
                 }
             ]
         )
-
+        
+        
         analysis = response.choices[0].message.content
     
 
     
     
     return get_game_state(game_id, analysis)
+
+
+@app.post("/api/games/{game_id}/next-move", response_model=GameResponse)
+async def make_next_move(game_id: str):
+    """Make the next move in the game using an ai model"""
+    if game_id not in games:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    board = games[game_id]
+
+    if board.turn == chess.BLACK:
+        model = "openai/gpt-5.2"
+    else:
+        model = "anthropic/claude-opus-4.5"
+
+    next_move = await get_next_move_from_ai(model, games[game_id])
+    next_move = next_move.strip()
+    next_move = next_move.replace("\n", "").replace("\r", "")
+    print("next_move :", next_move)
+    board.push(chess.Move.from_uci(next_move))
+    return get_game_state(game_id)
 
 
 @app.get("/api/games/{game_id}/legal-moves")
