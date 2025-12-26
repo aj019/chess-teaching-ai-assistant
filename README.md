@@ -43,7 +43,16 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-3. Run the FastAPI server:
+3. Create a `.env` file in the root of the backend directory if it does not exist, and add any required keys. For example:
+```
+# .env (example)
+
+OPENAI_API_KEY=your-openai-api-key-here
+# Add any other environment variables required by backend/main.py
+```
+**Note:** The required keys for the `.env` file may depend on features used in your backend, such as integration with AI APIs or other services. Please refer to `backend/main.py` or backend code comments for any additional environment variables needed.
+
+4. Run the FastAPI server:
 ```bash
 cd backend
 uvicorn main:app --reload --port 8000
@@ -63,7 +72,12 @@ cd frontend
 npm install
 ```
 
-3. Start the React development server:
+3. (Optional) If your frontend depends on any API base URL or environment configuration, create a `.env` file in the `frontend` directory and add necessary keys. Example:
+```
+REACT_APP_API_BASE_URL=http://localhost:8000
+```
+
+4. Start the React development server:
 ```bash
 npm start
 ```
